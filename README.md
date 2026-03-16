@@ -1,6 +1,6 @@
 # Data Repository for Amorphous FeGe paper
 
-[![DOI]()]()
+[![DOI](https://zenodo.org/badge/1182869832.svg)](https://doi.org/10.5281/zenodo.19053622)
 
 This is the data repository for the manuscipt "Disorder as a route to topological spin textures in amorphous magnets" by T.Bayaraa, and Sinéad M. Griffin.
 
