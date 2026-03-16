@@ -1,0 +1,1 @@
+# Amorphous_FeGe_paper_data
