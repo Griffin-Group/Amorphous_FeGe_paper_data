@@ -2,19 +2,21 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.gridspec as gridspec
-from matplotlib.colors import TwoSlopeNorm
+import matplotlib.patheffects as pe
+from matplotlib.colors import TwoSlopeNorm, LinearSegmentedColormap
+from matplotlib.lines import Line2D
 from matplotlib.ticker import MaxNLocator
 
 # --- 1. Load and Prepare the Data ---
 try:
-    df = pd.read_csv('J_DMI.txt', sep='\s+')
+    df = pd.read_csv('J_DMI.txt', sep=r'\s+')
     print("Successfully loaded J_DMI.txt")
 except FileNotFoundError:
     print("Error: 'J_DMI.txt' not found. Please create this file.")
     exit()
 
 try:
-    df_sia = pd.read_csv('SIA_eig_max.txt', sep='\s+', skiprows=2, 
+    df_sia = pd.read_csv('SIA_eig_max.txt', sep=r'\s+', skiprows=2, 
                          names=['Type', 'Fe_index', 'eig_max', 'N_Fe', 'N_Ge', 'N_total'])
     print("Successfully loaded SIA_eig_max.txt")
 except FileNotFoundError:
@@ -63,6 +65,15 @@ plt.rcParams.update({
 
 # --- NEW: Custom font size for panel labels ---
 panel_fontsize = 28 # Adjust this single value to change all panel labels
+annotation_fontsize = 14
+label_effects = [pe.withStroke(linewidth=3, foreground='white')]
+
+# --- Colorblind-friendly diverging map for panels a-d ---
+cmap_diverging = LinearSegmentedColormap.from_list(
+    'blue_orange_diverging',
+    ['#004488', '#F7F7F7', '#BB5500'],
+    N=256,
+)
 
 # --- 3. Create the Main Grid Layout ---
 fig = plt.figure(figsize=(24, 14))
@@ -71,19 +82,19 @@ gs_main = gridspec.GridSpec(2, 5, figure=fig, width_ratios=[20, 20, 1, 0.1, 20])
 
 # Assign axes to the new 5-column grid
 ax_a = fig.add_subplot(gs_main[0, 0]) # Col 1
-ax_b = fig.add_subplot(gs_main[1, 0]) # Col 1
-ax_c = fig.add_subplot(gs_main[0, 1]) # Col 2
+ax_b = fig.add_subplot(gs_main[0, 1]) # Col 2
+ax_c = fig.add_subplot(gs_main[1, 0]) # Col 1
 ax_d = fig.add_subplot(gs_main[1, 1]) # Col 2
 ax_e = fig.add_subplot(gs_main[0, 4]) # Col 5 (index 4)
 
 panel_labels = ['(a)', '(b)', '(c)', '(d)', '(e)', '(f)']
 y_axis_labels = {'J': 'J (meV)', 'D_x': 'D$_x$ (meV)', 'D_y': 'D$_y$ (meV)', 'D_z': 'D$_z$ (meV)'}
-norm = TwoSlopeNorm(vmin=df['m_product'].min(), vcenter=0, vmax=df['m_product'].max())
+norm = TwoSlopeNorm(vmin=-5, vcenter=0, vmax=5)
 
 # --- 4. Manually Create Plots ---
 
 # Panel (a)
-scatter = ax_a.scatter(df['r_ij'], df['J'], c=df['m_product'], s=120, cmap='bwr', alpha=0.8, edgecolors='black', linewidth=0.5, norm=norm)
+scatter = ax_a.scatter(df['r_ij'], df['J'], c=df['m_product'], s=120, cmap=cmap_diverging, alpha=0.8, edgecolors='black', linewidth=0.5, norm=norm)
 ax_a.axhline(0, color='black', linestyle='--', alpha=0.4, linewidth=1.5)
 ax_a.set_ylabel(y_axis_labels['J']); ax_a.set_ylim(-600, 100)
 ax_a.text(0.02, 0.98, panel_labels[0], transform=ax_a.transAxes, fontsize=panel_fontsize, fontweight='bold', va='top', ha='left')
@@ -95,30 +106,42 @@ coeffs = multivariate_polyfit(df_fit['r_ij'], df_fit['m_product'], df_fit['J'], 
 mu_mean = df_fit['m_product'].mean()
 x_fit = np.linspace(df['r_ij'].min(), df['r_ij'].max(), 200)
 y_fit = multivariate_polyval(x_fit, np.full_like(x_fit, mu_mean), coeffs, deg)
-ax_a.plot(x_fit, y_fit, color='black', linestyle='--', linewidth=2.5, label=f'3rd-order Polynomial Fit')
-ax_a.legend(loc='center right')
+ax_a.plot(x_fit, y_fit, color='black', linestyle='--', linewidth=2.5)
 y_predicted = multivariate_polyval(df_fit['r_ij'], df_fit['m_product'], coeffs, deg)
 y_actual = df_fit['J']
 ss_res = np.sum((y_actual - y_predicted) ** 2); ss_tot = np.sum((y_actual - np.mean(y_actual)) ** 2)
 r2 = 1 - (ss_res / ss_tot)
-ax_a.text(0.95, 0.05, f'R² = {r2:.2f}', transform=ax_a.transAxes, fontweight='bold', va='bottom', ha='right', bbox=dict(boxstyle='round,pad=0.4', facecolor='white', alpha=0.7))
+panel_a_legend_fontsize = 16
+legend_handles = [
+    Line2D([0], [0], color='black', linestyle='--', linewidth=2.5, label='3rd-order Polynomial Fit'),
+    Line2D([0], [0], color='none', label=f'R² = {r2:.2f}'),
+]
+ax_a.legend(
+    handles=legend_handles,
+    loc='lower right',
+    frameon=False,
+    fontsize=panel_a_legend_fontsize,
+    handlelength=2.2,
+    handletextpad=0.8,
+    borderaxespad=0.0,
+)
 
 # Panel (b)
-ax_b.scatter(df['r_ij'], df['D_x'], c=df['m_product'], s=120, cmap='bwr', alpha=0.8, edgecolors='black', linewidth=0.5, norm=norm)
+ax_b.scatter(df['r_ij'], df['D_y'], c=df['m_product'], s=120, cmap=cmap_diverging, alpha=0.8, edgecolors='black', linewidth=0.5, norm=norm)
 ax_b.axhline(0, color='black', linestyle='--', alpha=0.4, linewidth=1.5)
-ax_b.set_xlabel('r$_{ij}$ (Å)'); ax_b.set_ylabel(y_axis_labels['D_x'])
+ax_b.set_ylabel(y_axis_labels['D_y'])
 ax_b.text(0.02, 0.98, panel_labels[1], transform=ax_b.transAxes, fontsize=panel_fontsize, fontweight='bold', va='top', ha='left')
 ax_b.grid(False)
 
 # Panel (c)
-ax_c.scatter(df['r_ij'], df['D_y'], c=df['m_product'], s=120, cmap='bwr', alpha=0.8, edgecolors='black', linewidth=0.5, norm=norm)
+ax_c.scatter(df['r_ij'], df['D_x'], c=df['m_product'], s=120, cmap=cmap_diverging, alpha=0.8, edgecolors='black', linewidth=0.5, norm=norm)
 ax_c.axhline(0, color='black', linestyle='--', alpha=0.4, linewidth=1.5)
-ax_c.set_ylabel(y_axis_labels['D_y'])
+ax_c.set_xlabel('r$_{ij}$ (Å)'); ax_c.set_ylabel(y_axis_labels['D_x'])
 ax_c.text(0.02, 0.98, panel_labels[2], transform=ax_c.transAxes, fontsize=panel_fontsize, fontweight='bold', va='top', ha='left')
 ax_c.grid(False)
 
 # Panel (d)
-ax_d.scatter(df['r_ij'], df['D_z'], c=df['m_product'], s=120, cmap='bwr', alpha=0.8, edgecolors='black', linewidth=0.5, norm=norm)
+ax_d.scatter(df['r_ij'], df['D_z'], c=df['m_product'], s=120, cmap=cmap_diverging, alpha=0.8, edgecolors='black', linewidth=0.5, norm=norm)
 ax_d.axhline(0, color='black', linestyle='--', alpha=0.4, linewidth=1.5)
 ax_d.set_xlabel('r$_{ij}$ (Å)'); ax_d.set_ylabel(y_axis_labels['D_z'])
 ax_d.text(0.02, 0.98, panel_labels[3], transform=ax_d.transAxes, fontsize=panel_fontsize, fontweight='bold', va='top', ha='left')
@@ -126,14 +149,14 @@ ax_d.grid(False)
 
 # Panel (e)
 J_fm = df[df['J'] < 0]['J']; J_afm = df[df['J'] > 0]['J']
-ax_e.hist([J_fm, J_afm], bins=30, stacked=True, color=['#1f77b4', '#d62728'], label=['FM', 'AFM'])
-overall_mean = df['J'].mean(); overall_median = df['J'].median()
-stats_text = f'Mean: {overall_mean:.0f} (meV)\nMedian: {overall_median:.0f} (meV)'
-ax_e.plot([], [], ' ', label=stats_text); ax_e.set_ylabel('Count')
+ax_e.hist([J_fm, J_afm], bins=30, stacked=True, color=['#0072B2', '#D55E00'])
+ax_e.set_ylabel('Count')
 ax_e.axvline(0, color='black', linestyle='--', linewidth=1.5)
 ax_e.set_xlabel('J (meV)')
 ax_e.text(0.02, 0.98, panel_labels[4], transform=ax_e.transAxes, fontsize=panel_fontsize, fontweight='bold', va='top', ha='left')
-ax_e.legend(loc='center left'); ax_e.grid(False)
+ax_e.text(0.10, 0.91, 'FM', transform=ax_e.transAxes, fontsize=20, fontweight='bold', color='#0072B2', ha='left', va='top', path_effects=label_effects)
+ax_e.text(0.98, 0.91, 'AFM', transform=ax_e.transAxes, fontsize=20, fontweight='bold', color='#D55E00', ha='right', va='top', path_effects=label_effects)
+ax_e.grid(False)
 
 # Panel (f): Create 3 stacked subplots
 gs_f = gridspec.GridSpecFromSubplotSpec(3, 1, subplot_spec=gs_main[1, 4], hspace=0)
@@ -141,17 +164,17 @@ ax_f1 = fig.add_subplot(gs_f[0, 0])
 ax_f2 = fig.add_subplot(gs_f[1, 0], sharex=ax_f1, sharey=ax_f1)
 ax_f3 = fig.add_subplot(gs_f[2, 0], sharex=ax_f1, sharey=ax_f1)
 
-ax_f1.scatter(df_sia['N_Fe'], df_sia['eig_max'], s=100, alpha=0.7, color='tab:blue', label='Fe Neighbors')
-ax_f1.legend()
+ax_f1.scatter(df_sia['N_Fe'], df_sia['eig_max'], s=100, alpha=0.7, color='#0072B2')
 ax_f1.text(0.02, 0.85, panel_labels[5], transform=ax_f1.transAxes, fontsize=panel_fontsize, fontweight='bold', va='top', ha='left')
+ax_f1.text(0.98, 0.85, 'Fe Neighbors', transform=ax_f1.transAxes, fontsize=annotation_fontsize, fontweight='bold', color='#0072B2', ha='right', va='top', path_effects=label_effects)
 
-ax_f2.scatter(df_sia['N_Ge'], df_sia['eig_max'], s=100, alpha=0.7, color='tab:orange', label='Ge Neighbors')
-ax_f2.legend()
+ax_f2.scatter(df_sia['N_Ge'], df_sia['eig_max'], s=100, alpha=0.7, color='#D55E00')
 ax_f2.set_ylabel('Maximum absolute eigenvalue of SIA (meV)')
+ax_f2.text(0.98, 0.85, 'Ge Neighbors', transform=ax_f2.transAxes, fontsize=annotation_fontsize, fontweight='bold', color='#D55E00', ha='right', va='top', path_effects=label_effects)
 
-ax_f3.scatter(df_sia['N_total'], df_sia['eig_max'], s=150, alpha=0.9, color='tab:green', label='Total Neighbors')
-ax_f3.legend()
+ax_f3.scatter(df_sia['N_total'], df_sia['eig_max'], s=150, alpha=0.7, color='#009E73')
 ax_f3.set_xlabel('Number of Neighbors')
+ax_f3.text(0.08, 0.85, 'Total Neighbors', transform=ax_f3.transAxes, fontsize=annotation_fontsize, fontweight='bold', color='#009E73', ha='left', va='top', path_effects=label_effects)
 
 for ax in [ax_f1, ax_f2, ax_f3]:
     ax.grid(False)
@@ -162,19 +185,18 @@ for ax in [ax_f1, ax_f2, ax_f3]:
 plt.setp(ax_f1.get_xticklabels(), visible=False)
 plt.setp(ax_f2.get_xticklabels(), visible=False)
 plt.setp(ax_a.get_xticklabels(), visible=False)
-plt.setp(ax_c.get_xticklabels(), visible=False)
+plt.setp(ax_b.get_xticklabels(), visible=False)
 plt.setp(ax_e.get_xticklabels(), visible=False)
 
 # --- 5. Add a Shared, Shorter Colorbar with Specific Ticks ---
 gs_cbar = gridspec.GridSpecFromSubplotSpec(10, 1, subplot_spec=gs_main[:, 2])
 cbar_ax = fig.add_subplot(gs_cbar[3:6, 0]) 
 cbar = fig.colorbar(scatter, cax=cbar_ax)
-cbar.set_label('Magnetic Moment Product (m$_i \cdot$ m$_j$) [$\mu_B^2$]')
-cbar_min = df['m_product'].min(); cbar_max = df['m_product'].max()
-cbar.set_ticks([cbar_min, 0, cbar_max])
-cbar.set_ticklabels([f'{cbar_min:.0f}', '0', f'{cbar_max:.0f}'])
+cbar.set_label(r'Magnetic Moment Product (m$_i \cdot$ m$_j$) [$\mu_B^2$]')
+cbar.set_ticks([-5, 0, 5])
+cbar.set_ticklabels(['-5', '0', '5'])
 
 # --- 6. Adjust Layout and Save ---
-gs_main.tight_layout(fig)
+gs_main.tight_layout(fig, rect=[0, 0.02, 1, 1])
 plt.savefig('Fig3.png', dpi=300, facecolor='white')
 plt.show()
